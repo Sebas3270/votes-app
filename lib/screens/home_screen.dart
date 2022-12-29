@@ -1,8 +1,11 @@
 import 'dart:io';
 
+import 'package:provider/provider.dart';
 import 'package:sports_names/models/models.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:sports_names/services/services.dart';
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -12,40 +15,97 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  List<Sport> bands = [
-    Sport(id: '1', name: 'Basquetball', votes: 5),
-    Sport(id: '2', name: 'Soccer', votes: 2),
-    Sport(id: '3', name: 'Swimming', votes: 3),
-    Sport(id: '4', name: 'Tenis', votes: 5),
+  List<Sport> sports = [
+    // Sport(id: '1', name: 'Basquetball', votes: 5),
+    // Sport(id: '2', name: 'Soccer', votes: 2),
+    // Sport(id: '3', name: 'Swimming', votes: 3),
+    // Sport(id: '4', name: 'Tenis', votes: 5),
   ];
+
+  _handleActiveBands(dynamic sportsData){
+      sports = (sportsData as List<dynamic>)
+        .map((sport) => Sport.fromMap(sport))
+        .toList();
+
+      setState(() {});
+  }
+
+  @override
+  void initState() {
+
+    final socketsService = Provider.of<SocketService>(context, listen: false);
+    socketsService.socket.on('active-sports', _handleActiveBands);
+    super.initState();
+    
+  }
 
   @override
   Widget build(BuildContext context) {
+
+    final socketsService = Provider.of<SocketService>(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Sports Names',
           style: TextStyle(color: Colors.black),
         ),
         elevation: 0,
         backgroundColor: Colors.transparent,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 15),
+            child: socketsService.serverStatus == ServerStatus.Online 
+            ? const Icon(Icons.check_circle,color: Colors.blue,)
+            : const Icon(Icons.offline_bolt,color: Colors.red,)
+            ,
+          )
+        ],
       ),
-      body: ListView.builder(
-        itemCount: bands.length,
-        itemBuilder: (context, index) {
-          return _sportTile(bands[index]);
-        },
+      body: Column(
+        children: [
+          Container(
+            height: 250,
+            child: SfCircularChart(
+              legend: Legend(
+                isVisible: true,
+                isResponsive: true,
+              ),
+              series: <CircularSeries>[
+                DoughnutSeries<Sport, String>(
+                  dataSource: sports,
+                  xValueMapper: (datum, index) => datum.name,
+                  yValueMapper: (datum, index) => datum.votes,
+                  dataLabelSettings: const DataLabelSettings(
+                    isVisible: true,
+                  ),
+                )
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              itemCount: sports.length,
+              itemBuilder: (context, index) {
+                return _sportTile(sports[index]);
+              },
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
-        child: Icon(Icons.add),
         onPressed: addNewSport,
+        child: const Icon(Icons.add),
       ),
     );
   }
 
-  Widget _sportTile(Sport band) {
+  Widget _sportTile(Sport sport) {
+
+    final socketsService = Provider.of<SocketService>(context, listen: false);
+
     return Dismissible(
-      key: Key(band.id),
+      key: Key(sport.id),
       direction: DismissDirection.endToStart,
       background: Container(
         color: Colors.red,
@@ -61,17 +121,18 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: ListTile(
         leading: CircleAvatar(
-          child: Text(band.name.substring(0, 2)),
+          child: Text(sport.name.substring(0, 2)),
           backgroundColor: Colors.blue[100],
         ),
-        title: Text(band.name),
-        trailing: Text(band.votes.toString()),
+        title: Text(sport.name),
+        trailing: Text(sport.votes.toString()),
         onTap: () {
-          print(band.name);
+          socketsService.socket.emit('vote-sport',{'id': sport.id});
         },
       ),
       onDismissed: (direction) {
         //TODO: Delete from server
+        socketsService.socket.emit('delete-sports', {'id': sport.id});
       },
     );
   }
@@ -84,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: Text('Band Name'),
+            title: Text('Sport Name'),
             content: TextField(
               controller: textController,
             ),
@@ -106,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context, 
       builder: (context) {
         return CupertinoAlertDialog(
-          title: Text('Band Name'),
+          title: Text('Sport name'),
           content: CupertinoTextField(
             controller: textController,
           ),
@@ -129,11 +190,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void addSportToList(String name) {
     if (name.isNotEmpty) {
-      setState(() {
-        bands.add(
-          Sport(id: DateTime.now().toString(), name: name, votes: 0)
-        );
-      });
+      final socketsService = Provider.of<SocketService>(context, listen: false);
+      socketsService.socket.emit('add-sports', {'name': name});
     }
 
     Navigator.pop(context);
