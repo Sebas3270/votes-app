@@ -22,86 +22,111 @@ class _HomeScreenState extends State<HomeScreen> {
     // Sport(id: '4', name: 'Tenis', votes: 5),
   ];
 
-  _handleActiveBands(dynamic sportsData){
-      sports = (sportsData as List<dynamic>)
+  _handleActiveBands(dynamic sportsData) {
+    sports = (sportsData as List<dynamic>)
         .map((sport) => Sport.fromMap(sport))
         .toList();
 
-      setState(() {});
+    setState(() {});
   }
 
   @override
   void initState() {
-
     final socketsService = Provider.of<SocketService>(context, listen: false);
     socketsService.socket.on('active-sports', _handleActiveBands);
     super.initState();
-    
   }
 
   @override
   Widget build(BuildContext context) {
-
     final socketsService = Provider.of<SocketService>(context);
+    // const mainColor = Color.fromARGB(255, 24, 23, 23);
+    const mainColor = Color.fromARGB(255, 23, 22, 22);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Sports Names',
-          style: TextStyle(color: Colors.black),
+        titleSpacing: 10,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          children: const [
+            Text(
+              'Sports Survey',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.bold
+              ),
+            ),
+          ],
         ),
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: mainColor,
         actions: [
           Container(
             margin: const EdgeInsets.only(right: 15),
-            child: socketsService.serverStatus == ServerStatus.Online 
-            ? const Icon(Icons.check_circle,color: Colors.blue,)
-            : const Icon(Icons.offline_bolt,color: Colors.red,)
-            ,
+            child: socketsService.serverStatus == ServerStatus.Online
+                ? const Icon(
+                    Icons.check_circle,
+                    color: Colors.green,
+                  )
+                : const Icon(
+                    Icons.offline_bolt,
+                    color: Colors.red,
+                  ),
           )
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Container(
-            height: 250,
-            child: SfCircularChart(
-              legend: Legend(
-                isVisible: true,
-                isResponsive: true,
+
+          const _BackgroundImage(
+            mainColor: mainColor,
+            height: 450,
+            opacity: 0.2,
+          ),
+
+          Column(
+            children: [
+              _ChartContainer(sports: sports),
+
+              // ClipRRect(
+              //   borderRadius: BorderRadius.all(Radius.circular(20)),
+              //   child: Padding(
+              //     padding: const EdgeInsets.all(15.0),
+              //     child: MaterialButton(
+              //       color: Colors.red,
+              //       child: Container(
+              //         padding: EdgeInsets.symmetric(vertical: 20),
+              //         // width: double.infinity,
+              //         child: Text('Add Sport'),
+              //       ),
+              //       onPressed: addNewSport,
+              //     ),
+              //   ),
+              // ),
+
+              Expanded(
+                child: ListView.builder(
+                  itemCount: sports.length,
+                  itemBuilder: (context, index) {
+                    return _sportTile(sports[index]);
+                  },
+                ),
               ),
-              series: <CircularSeries>[
-                DoughnutSeries<Sport, String>(
-                  dataSource: sports,
-                  xValueMapper: (datum, index) => datum.name,
-                  yValueMapper: (datum, index) => datum.votes,
-                  dataLabelSettings: const DataLabelSettings(
-                    isVisible: true,
-                  ),
-                )
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: sports.length,
-              itemBuilder: (context, index) {
-                return _sportTile(sports[index]);
-              },
-            ),
-          ),
+            ],
+          )
         ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: addNewSport,
+        backgroundColor: const Color.fromARGB(255, 203, 72, 11),
         child: const Icon(Icons.add),
       ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 
   Widget _sportTile(Sport sport) {
-
     final socketsService = Provider.of<SocketService>(context, listen: false);
 
     return Dismissible(
@@ -114,20 +139,40 @@ class _HomeScreenState extends State<HomeScreen> {
           children: const [
             Padding(
               padding: EdgeInsets.only(right: 10),
-              child: Icon(Icons.delete, color: Colors.white,),
+              child: Icon(
+                Icons.delete,
+                color: Colors.white,
+              ),
             ),
           ],
         ),
       ),
       child: ListTile(
         leading: CircleAvatar(
-          child: Text(sport.name.substring(0, 2)),
-          backgroundColor: Colors.blue[100],
+          backgroundColor: Color.fromARGB(255, 14, 81, 6),
+          child: Text(sport.name.substring(0, 2),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16
+            ),
+          ),
         ),
-        title: Text(sport.name),
-        trailing: Text(sport.votes.toString()),
+        title: Text(
+          sport.name,
+          style: const TextStyle(
+            color: Colors.white,
+          ),
+        ),
+        trailing: Text(sport.votes.toString(),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 16
+          ),
+        ),
         onTap: () {
-          socketsService.socket.emit('vote-sport',{'id': sport.id});
+          socketsService.socket.emit('vote-sport', {'id': sport.id});
         },
       ),
       onDismissed: (direction) {
@@ -164,10 +209,10 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return showCupertinoDialog(
-      context: context, 
+      context: context,
       builder: (context) {
         return CupertinoAlertDialog(
-          title: Text('Sport name'),
+          title: const Text('Sport name'),
           content: CupertinoTextField(
             controller: textController,
           ),
@@ -195,5 +240,81 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     Navigator.pop(context);
+  }
+}
+
+class _ChartContainer extends StatelessWidget {
+  const _ChartContainer({
+    Key? key,
+    required this.sports,
+  }) : super(key: key);
+
+  final List<Sport> sports;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 250,
+      child: SfCircularChart(
+        legend: Legend(
+          isVisible: true,
+          isResponsive: true,
+          textStyle: const TextStyle(
+            color: Colors.white,
+          )
+        ),
+        series: <CircularSeries>[
+          DoughnutSeries<Sport, String>(
+            dataSource: sports,
+            xValueMapper: (datum, index) => datum.name,
+            yValueMapper: (datum, index) => datum.votes,
+            dataLabelSettings: const DataLabelSettings(
+              isVisible: true,
+            ),
+          )
+        ],
+      ),
+    );
+  }
+}
+
+class _BackgroundImage extends StatelessWidget {
+  const _BackgroundImage({
+    Key? key,
+    required this.mainColor,
+    required this.height, 
+    required this.opacity,
+  }) : super(key: key);
+
+  final Color mainColor;
+  final double height;
+  final double opacity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height,
+      width: MediaQuery.of(context).size.width,
+      color: mainColor,
+      child: Stack(
+        children: [
+          Positioned(
+            bottom: -100,
+            right: -40,
+            child: Opacity(
+              opacity: opacity,
+              child: Container(
+                height: height,
+                color: Colors.transparent,
+                child: Image.asset(
+                  'assets/player.png',
+                  // opacity: const AlwaysStoppedAnimation(.5),
+                ),
+              ),
+            ),
+          ),
+        ]
+      ),
+    );
   }
 }
